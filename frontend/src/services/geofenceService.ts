@@ -1,21 +1,18 @@
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Incident } from '../store/incidentStore';
 import notificationService from './notificationService';
 
-const GEOFENCE_TASK_NAME = 'ALERION_GEOFENCE_TASK';
-const LOCATION_TASK_NAME = 'ALERION_LOCATION_TASK';
 const GEOFENCE_SETTINGS_KEY = 'geofence_settings';
 const MONITORED_INCIDENTS_KEY = 'monitored_incidents';
 
 export interface GeofenceSettings {
   enabled: boolean;
-  radiusMiles: number; // Default radius in miles
+  radiusMiles: number;
   alertOnEntry: boolean;
   alertOnExit: boolean;
   highPriorityOnly: boolean;
-  incidentTypes: string[]; // Which incident types to monitor
+  incidentTypes: string[];
 }
 
 const defaultSettings: GeofenceSettings = {
@@ -36,50 +33,12 @@ interface MonitoredIncident {
   radius: number;
 }
 
-// Define the geofence task
-TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
-  if (error) {
-    console.error('Geofence task error:', error);
-    return;
-  }
-
-  if (data) {
-    const { eventType, region } = data;
-    const settings = await geofenceService.getSettings();
-    
-    // Get incident details from stored data
-    const monitoredIncidents = await geofenceService.getMonitoredIncidents();
-    const incident = monitoredIncidents.find(i => i.id === region.identifier);
-    
-    if (!incident) return;
-
-    if (eventType === Location.GeofencingEventType.Enter && settings.alertOnEntry) {
-      await notificationService.notifyGeofenceEntry(incident);
-    } else if (eventType === Location.GeofencingEventType.Exit && settings.alertOnExit) {
-      await notificationService.notifyGeofenceExit(incident);
-    }
-  }
-});
-
-// Define background location task
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
-  if (error) {
-    console.error('Location task error:', error);
-    return;
-  }
-
-  if (data) {
-    const { locations } = data;
-    if (locations && locations.length > 0) {
-      const location = locations[0];
-      await geofenceService.checkProximityToIncidents(location.coords);
-    }
-  }
-});
+let locationSubscription: Location.LocationSubscription | null = null;
+let lastCheckedIncidents: Map<string, number> = new Map();
 
 export const geofenceService = {
   settings: { ...defaultSettings },
-  userLocation: null as Location.LocationObject | null,
+  userLocation: null as Location.LocationObjectCoords | null,
 
   async initialize(): Promise<boolean> {
     try {
@@ -96,20 +55,18 @@ export const geofenceService = {
         return false;
       }
 
-      // Request background location permission
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        console.log('Background location permission not granted');
-        // Can still work with foreground-only
+      // Get current location
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        this.userLocation = location.coords;
+      } catch (e) {
+        console.log('Could not get initial location');
       }
 
-      // Get current location
-      this.userLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
       if (this.settings.enabled) {
-        await this.startGeofencing();
+        await this.startLocationMonitoring();
       }
 
       console.log('Geofence service initialized');
@@ -125,9 +82,9 @@ export const geofenceService = {
     await AsyncStorage.setItem(GEOFENCE_SETTINGS_KEY, JSON.stringify(this.settings));
 
     if (this.settings.enabled) {
-      await this.startGeofencing();
+      await this.startLocationMonitoring();
     } else {
-      await this.stopGeofencing();
+      await this.stopLocationMonitoring();
     }
   },
 
@@ -148,7 +105,7 @@ export const geofenceService = {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      this.userLocation = location;
+      this.userLocation = location.coords;
       return location.coords;
     } catch (error) {
       console.error('Error getting current location:', error);
@@ -156,46 +113,45 @@ export const geofenceService = {
     }
   },
 
-  async startGeofencing(): Promise<void> {
+  async startLocationMonitoring(): Promise<void> {
     try {
-      // Start background location updates
-      const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-      if (!hasStarted) {
-        await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+      // Stop existing subscription
+      await this.stopLocationMonitoring();
+
+      // Start watching location (foreground only in Expo Go)
+      locationSubscription = await Location.watchPositionAsync(
+        {
           accuracy: Location.Accuracy.Balanced,
           distanceInterval: 100, // Update every 100 meters
-          deferredUpdatesInterval: 60000, // Or every minute
-          showsBackgroundLocationIndicator: true,
-          foregroundService: {
-            notificationTitle: 'Alerion Alert',
-            notificationBody: 'Monitoring nearby incidents',
-            notificationColor: '#3b82f6',
-          },
-        });
-      }
-      console.log('Geofencing started');
+          timeInterval: 30000, // Or every 30 seconds
+        },
+        (location) => {
+          this.userLocation = location.coords;
+          this.checkProximityToIncidents(location.coords);
+        }
+      );
+      
+      console.log('Location monitoring started');
     } catch (error) {
-      console.error('Error starting geofencing:', error);
+      console.error('Error starting location monitoring:', error);
     }
   },
 
-  async stopGeofencing(): Promise<void> {
+  async stopLocationMonitoring(): Promise<void> {
     try {
-      const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-      if (hasStarted) {
-        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      if (locationSubscription) {
+        locationSubscription.remove();
+        locationSubscription = null;
       }
-
-      // Stop all geofences
-      const hasGeofencing = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK_NAME);
-      if (hasGeofencing) {
-        await Location.stopGeofencingAsync(GEOFENCE_TASK_NAME);
-      }
-
-      console.log('Geofencing stopped');
+      console.log('Location monitoring stopped');
     } catch (error) {
-      console.error('Error stopping geofencing:', error);
+      console.error('Error stopping location monitoring:', error);
     }
+  },
+
+  // Alias for backward compatibility
+  async stopGeofencing(): Promise<void> {
+    await this.stopLocationMonitoring();
   },
 
   async updateGeofencesForIncidents(incidents: Incident[]): Promise<void> {
@@ -217,17 +173,7 @@ export const geofenceService = {
       // Convert radius from miles to meters
       const radiusMeters = this.settings.radiusMiles * 1609.34;
 
-      // Create geofence regions
-      const regions: Location.LocationRegion[] = filteredIncidents.slice(0, 20).map(incident => ({
-        identifier: incident._id,
-        latitude: incident.lat,
-        longitude: incident.lng,
-        radius: radiusMeters,
-        notifyOnEnter: this.settings.alertOnEntry,
-        notifyOnExit: this.settings.alertOnExit,
-      }));
-
-      // Store incident details for later use in notifications
+      // Store incident details for proximity checking
       const monitoredIncidents: MonitoredIncident[] = filteredIncidents.slice(0, 20).map(i => ({
         id: i._id,
         title: i.title,
@@ -238,17 +184,9 @@ export const geofenceService = {
       }));
       await this.saveMonitoredIncidents(monitoredIncidents);
 
-      // Start geofencing with new regions
-      if (regions.length > 0) {
-        const hasGeofencing = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK_NAME);
-        if (hasGeofencing) {
-          await Location.stopGeofencingAsync(GEOFENCE_TASK_NAME);
-        }
-        await Location.startGeofencingAsync(GEOFENCE_TASK_NAME, regions);
-        console.log(`Monitoring ${regions.length} incident geofences`);
-      }
+      console.log(`Monitoring ${monitoredIncidents.length} incidents for proximity`);
     } catch (error) {
-      console.error('Error updating geofences:', error);
+      console.error('Error updating monitored incidents:', error);
     }
   },
 
@@ -257,6 +195,8 @@ export const geofenceService = {
 
     const monitoredIncidents = await this.getMonitoredIncidents();
     const radiusMeters = this.settings.radiusMiles * 1609.34;
+    const now = Date.now();
+    const COOLDOWN_MS = 30 * 60 * 1000; // 30 minute cooldown
 
     for (const incident of monitoredIncidents) {
       const distance = this.calculateDistance(
@@ -267,14 +207,12 @@ export const geofenceService = {
       );
 
       if (distance <= radiusMeters) {
-        // Check if we've already notified about this incident recently
-        const notifiedKey = `notified_${incident.id}`;
-        const lastNotified = await AsyncStorage.getItem(notifiedKey);
-        const now = Date.now();
-
-        if (!lastNotified || now - parseInt(lastNotified) > 30 * 60 * 1000) { // 30 min cooldown
+        // Check cooldown
+        const lastNotified = lastCheckedIncidents.get(incident.id) || 0;
+        
+        if (now - lastNotified > COOLDOWN_MS) {
           await notificationService.notifyNearbyIncident(incident, distance);
-          await AsyncStorage.setItem(notifiedKey, now.toString());
+          lastCheckedIncidents.set(incident.id, now);
         }
       }
     }
@@ -283,14 +221,14 @@ export const geofenceService = {
   calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     // Haversine formula
     const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
 
     const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // Distance in meters
