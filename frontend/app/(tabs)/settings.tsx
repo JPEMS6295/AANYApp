@@ -7,12 +7,10 @@ import {
   ScrollView,
   Alert,
   Switch,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import { useAuthStore } from '../../src/store/authStore';
 import { Colors } from '../../src/constants/theme';
 import notificationService, { NotificationSettings } from '../../src/services/notificationService';
