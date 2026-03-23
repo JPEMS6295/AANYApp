@@ -4,12 +4,13 @@ import { useEffect } from 'react';
 import { useAuthStore } from '../../src/store/authStore';
 import { useIncidentStore } from '../../src/store/incidentStore';
 import { initSocket, disconnectSocket } from '../../src/api/socket';
+import geofenceService from '../../src/services/geofenceService';
 import { Colors } from '../../src/constants/theme';
 import { View, Text, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const { userType } = useAuthStore();
-  const { fetchIncidents, fetchEASAlerts, easAlerts } = useIncidentStore();
+  const { fetchIncidents, fetchEASAlerts, easAlerts, incidents } = useIncidentStore();
 
   useEffect(() => {
     // Initialize socket and fetch data
@@ -21,6 +22,13 @@ export default function TabLayout() {
       disconnectSocket();
     };
   }, []);
+
+  // Update geofences when incidents change
+  useEffect(() => {
+    if (incidents.length > 0) {
+      geofenceService.updateGeofencesForIncidents(incidents);
+    }
+  }, [incidents]);
 
   const isAdmin = userType === 'admin';
 

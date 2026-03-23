@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../src/store/authStore';
 import notificationService from '../src/services/notificationService';
+import geofenceService from '../src/services/geofenceService';
 
 export default function RootLayout() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -15,6 +16,9 @@ export default function RootLayout() {
     
     // Initialize notifications
     notificationService.initialize();
+    
+    // Initialize geofencing (will only start if enabled in settings)
+    geofenceService.initialize();
 
     // Handle notification taps
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {

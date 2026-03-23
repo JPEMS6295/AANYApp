@@ -12,9 +12,12 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "View incidents near your location",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Get alerts for nearby incidents even when app is in background",
+        "NSLocationAlwaysUsageDescription": "Get alerts for nearby incidents even when app is in background",
         "NSMicrophoneUsageDescription": "Record audio for incident reports",
         "NSCameraUsageDescription": "Take photos for incident reports",
-        "NSPhotoLibraryUsageDescription": "Select photos for incident reports"
+        "NSPhotoLibraryUsageDescription": "Select photos for incident reports",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
       }
     },
     "android": {
@@ -26,10 +29,15 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "RECORD_AUDIO",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
