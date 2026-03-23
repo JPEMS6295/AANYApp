@@ -54,6 +54,14 @@
         {
           "locationWhenInUsePermission": "View incidents near your location"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#3b82f6",
+          "sounds": []
+        }
       ]
     ],
     "experiments": {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,40 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import { Colors } from '../../src/constants/theme';
+import notificationService, { NotificationSettings } from '../../src/services/notificationService';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, userType, logout } = useAuthStore();
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
+    enabled: true,
+    soundEnabled: true,
+    incidentAlerts: true,
+    easAlerts: true,
+    highPriorityOnly: false,
+  });
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    const settings = await notificationService.getSettings();
+    setNotifSettings(settings);
+  };
+
+  const updateSetting = async (key: keyof NotificationSettings, value: boolean) => {
+    const newSettings = { ...notifSettings, [key]: value };
+    setNotifSettings(newSettings);
+    await notificationService.saveSettings({ [key]: value });
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -33,6 +57,11 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleClearNotifications = async () => {
+    await notificationService.clearAllNotifications();
+    Alert.alert('Cleared', 'All notifications have been cleared');
   };
 
   return (
@@ -61,45 +90,106 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Settings Sections */}
+        {/* Notification Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>Notifications</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Ionicons name="person-outline" size={20} color={Colors.dark.textSecondary} />
+              <Ionicons name="notifications" size={20} color={Colors.dark.textSecondary} />
             </View>
-            <Text style={styles.settingText}>Profile</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.dark.textMuted} />
-          </TouchableOpacity>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>Push Notifications</Text>
+              <Text style={styles.settingDescription}>Receive alerts for new incidents</Text>
+            </View>
+            <Switch
+              value={notifSettings.enabled}
+              onValueChange={(value) => updateSetting('enabled', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+            />
+          </View>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Ionicons name="notifications-outline" size={20} color={Colors.dark.textSecondary} />
+              <Ionicons name="volume-high" size={20} color={Colors.dark.textSecondary} />
             </View>
-            <Text style={styles.settingText}>Notifications</Text>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>Sound</Text>
+              <Text style={styles.settingDescription}>Play sound with notifications</Text>
+            </View>
+            <Switch
+              value={notifSettings.soundEnabled}
+              onValueChange={(value) => updateSetting('soundEnabled', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+              disabled={!notifSettings.enabled}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="flame" size={20} color={Colors.dark.fire} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>Incident Alerts</Text>
+              <Text style={styles.settingDescription}>Fire, EMS, Police incidents</Text>
+            </View>
+            <Switch
+              value={notifSettings.incidentAlerts}
+              onValueChange={(value) => updateSetting('incidentAlerts', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+              disabled={!notifSettings.enabled}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="warning" size={20} color={Colors.dark.warning} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>EAS Alerts</Text>
+              <Text style={styles.settingDescription}>Emergency Alert System</Text>
+            </View>
+            <Switch
+              value={notifSettings.easAlerts}
+              onValueChange={(value) => updateSetting('easAlerts', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+              disabled={!notifSettings.enabled}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="alert-circle" size={20} color={Colors.dark.error} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>High Priority Only</Text>
+              <Text style={styles.settingDescription}>Only critical/high priority alerts</Text>
+            </View>
+            <Switch
+              value={notifSettings.highPriorityOnly}
+              onValueChange={(value) => updateSetting('highPriorityOnly', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+              disabled={!notifSettings.enabled}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.settingButton} onPress={handleClearNotifications}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="trash-outline" size={20} color={Colors.dark.textSecondary} />
+            </View>
+            <Text style={styles.settingText}>Clear All Notifications</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.dark.textMuted} />
           </TouchableOpacity>
         </View>
 
+        {/* App Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingIcon}>
-              <Ionicons name="volume-high-outline" size={20} color={Colors.dark.textSecondary} />
-            </View>
-            <Text style={styles.settingText}>Sound Alerts</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.dark.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingIcon}>
-              <Ionicons name="map-outline" size={20} color={Colors.dark.textSecondary} />
-            </View>
-            <Text style={styles.settingText}>Map Settings</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.dark.textMuted} />
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>App</Text>
 
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingIcon}>
@@ -110,16 +200,17 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* About */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
               <Ionicons name="information-circle-outline" size={20} color={Colors.dark.textSecondary} />
             </View>
             <Text style={styles.settingText}>Version</Text>
             <Text style={styles.settingValue}>4.0.0</Text>
-          </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingIcon}>
@@ -233,15 +324,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.dark.border,
   },
+  settingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.surface,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
   settingIcon: {
     width: 32,
     alignItems: 'center',
     marginRight: 12,
   },
+  settingContent: {
+    flex: 1,
+  },
   settingText: {
     flex: 1,
     fontSize: 15,
     color: Colors.dark.text,
+  },
+  settingDescription: {
+    fontSize: 12,
+    color: Colors.dark.textMuted,
+    marginTop: 2,
   },
   settingValue: {
     fontSize: 14,
