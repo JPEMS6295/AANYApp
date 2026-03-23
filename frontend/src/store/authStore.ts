@@ -45,20 +45,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         return { success: true };
       }
-      return { success: false, error: response.data.error || 'Login failed' };
+      return { success: false, error: response.data.error || 'Invalid credentials' };
     } catch (error: any) {
-      console.error('Login error:', error);
-      return { success: false, error: error.response?.data?.error || 'Connection failed' };
+      // Don't log as error - this is expected for invalid credentials
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          'Unable to connect. Please check your connection.';
+      return { success: false, error: errorMessage };
     }
   },
 
   logout: async () => {
     try {
       const userType = get().userType;
-      const endpoint = userType === 'admin' ? '/api/admin/logout' : '/api/viewer/logout';
-      await apiClient.post(endpoint);
+      if (userType) {
+        const endpoint = userType === 'admin' ? '/api/admin/logout' : '/api/viewer/logout';
+        await apiClient.post(endpoint).catch(() => {});
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      // Silently fail - we're logging out anyway
     } finally {
       await AsyncStorage.removeItem('userType');
       await AsyncStorage.removeItem('userData');
@@ -74,23 +79,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const storedUserData = await AsyncStorage.getItem('userData');
       
       if (storedUserType && storedUserData) {
-        const endpoint = storedUserType === 'admin' ? '/api/admin/me' : '/api/viewer/me';
-        const response = await apiClient.get(endpoint);
-        
-        if (response.data.ok) {
-          set({
-            user: JSON.parse(storedUserData),
-            isAuthenticated: true,
-            userType: storedUserType as 'viewer' | 'admin',
-            isLoading: false,
-          });
-          return;
+        try {
+          const endpoint = storedUserType === 'admin' ? '/api/admin/me' : '/api/viewer/me';
+          const response = await apiClient.get(endpoint);
+          
+          if (response.data && response.data.ok) {
+            set({
+              user: JSON.parse(storedUserData),
+              isAuthenticated: true,
+              userType: storedUserType as 'viewer' | 'admin',
+              isLoading: false,
+            });
+            return;
+          }
+        } catch (apiError) {
+          // Session expired or invalid - clear stored data silently
+          await AsyncStorage.removeItem('userType');
+          await AsyncStorage.removeItem('userData');
         }
       }
       
+      // Not authenticated - this is normal, not an error
       set({ user: null, isAuthenticated: false, userType: null, isLoading: false });
     } catch (error) {
-      console.error('Auth check error:', error);
+      // Storage error - just set as not authenticated
       set({ user: null, isAuthenticated: false, userType: null, isLoading: false });
     }
   },
