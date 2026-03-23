@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "View incidents near your location",
-        "NSMicrophoneUsageDescription": "Record audio for incident reports"
+        "NSMicrophoneUsageDescription": "Record audio for incident reports",
+        "NSCameraUsageDescription": "Take photos for incident reports",
+        "NSPhotoLibraryUsageDescription": "Select photos for incident reports"
       }
     },
     "android": {
@@ -24,7 +26,10 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
