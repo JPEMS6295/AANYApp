@@ -2,7 +2,8 @@ import { io, Socket } from 'socket.io-client';
 import { useIncidentStore } from '../store/incidentStore';
 import notificationService from '../services/notificationService';
 
-const SOCKET_URL = 'https://core.alerionalert.com';
+// Use environment variable or default to production backend
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || 'https://core.alerionalert.com';
 
 let socket: Socket | null = null;
 
