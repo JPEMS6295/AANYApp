@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   };
 
   const testTTS = async () => {
-    await ttsService.speak('Ten Seventy Five, Working Fire. At 123 Main Street, Manhattan');
+    await ttsService.speak('Ten Seventy Five, Working Fire. 123 Main Street, Manhattan');
   };
 
   const handleEnableGeofencing = async (value: boolean) => {

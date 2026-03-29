@@ -236,7 +236,7 @@ export const ttsService = {
     // Clean up location for speech (remove abbreviations that sound awkward)
     const cleanLocation = cleanLocationForSpeech(location);
     
-    const speechText = `Attention. ${readableType}. At ${cleanLocation}`;
+    const speechText = `${readableType}. ${cleanLocation}`;
     
     console.log(`TTS: Speaking - "${speechText}"`);
     
