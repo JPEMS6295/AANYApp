@@ -5,6 +5,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { useIncidentStore } from '../../src/store/incidentStore';
 import { initSocket, disconnectSocket } from '../../src/api/socket';
 import geofenceService from '../../src/services/geofenceService';
+import ttsService from '../../src/services/ttsService';
 import { Colors } from '../../src/constants/theme';
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -17,9 +18,13 @@ export default function TabLayout() {
     initSocket();
     fetchIncidents();
     fetchEASAlerts();
+    
+    // Initialize TTS service for voice alerts
+    ttsService.initialize();
 
     return () => {
       disconnectSocket();
+      ttsService.stop();
     };
   }, []);
 

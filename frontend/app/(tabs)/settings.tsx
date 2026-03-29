@@ -15,6 +15,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { Colors } from '../../src/constants/theme';
 import notificationService, { NotificationSettings } from '../../src/services/notificationService';
 import geofenceService, { GeofenceSettings } from '../../src/services/geofenceService';
+import ttsService, { TTSSettings } from '../../src/services/ttsService';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -37,6 +38,12 @@ export default function SettingsScreen() {
     highPriorityOnly: false,
     incidentTypes: ['fire', 'ems', 'police', 'hazmat'],
   });
+  const [ttsSettings, setTtsSettings] = useState<TTSSettings>({
+    enabled: true,
+    rate: 0.95,
+    pitch: 0.85,
+    volume: 1.0,
+  });
 
   useEffect(() => {
     loadSettings();
@@ -47,6 +54,8 @@ export default function SettingsScreen() {
     setNotifSettings(notif);
     const geo = await geofenceService.getSettings();
     setGeoSettings(geo);
+    const tts = await ttsService.getSettings();
+    setTtsSettings(tts);
   };
 
   const updateNotifSetting = async (key: keyof NotificationSettings, value: boolean) => {
@@ -59,6 +68,16 @@ export default function SettingsScreen() {
     const newSettings = { ...geoSettings, [key]: value };
     setGeoSettings(newSettings);
     await geofenceService.saveSettings({ [key]: value });
+  };
+
+  const updateTtsSetting = async (key: keyof TTSSettings, value: any) => {
+    const newSettings = { ...ttsSettings, [key]: value };
+    setTtsSettings(newSettings);
+    await ttsService.saveSettings({ [key]: value });
+  };
+
+  const testTTS = async () => {
+    await ttsService.speak('Ten Seventy Five, Working Fire. At 123 Main Street, Manhattan');
   };
 
   const handleEnableGeofencing = async (value: boolean) => {
@@ -264,6 +283,71 @@ export default function SettingsScreen() {
             <Text style={styles.settingText}>Clear All Notifications</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.dark.textMuted} />
           </TouchableOpacity>
+        </View>
+
+        {/* Voice Alerts (TTS) Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Voice Alerts (TTS)</Text>
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="mic" size={20} color={Colors.dark.accent} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingText}>Voice Announcements</Text>
+              <Text style={styles.settingDescription}>Read incident type & location aloud</Text>
+            </View>
+            <Switch
+              value={ttsSettings.enabled}
+              onValueChange={(value) => updateTtsSetting('enabled', value)}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.accent }}
+              thumbColor={Colors.dark.text}
+            />
+          </View>
+
+          {ttsSettings.enabled && (
+            <>
+              <View style={styles.ttsInfoBox}>
+                <Ionicons name="information-circle" size={18} color={Colors.dark.accent} />
+                <Text style={styles.ttsInfoText}>
+                  Voice alerts trigger for: 10-75, 10-76, 10-77, 10-60 through 10-66, ALL HANDS, and 2nd-8th Alarms
+                </Text>
+              </View>
+
+              <View style={styles.sliderContainer}>
+                <View style={styles.sliderHeader}>
+                  <Text style={styles.sliderLabel}>Speech Rate</Text>
+                  <Text style={styles.sliderValue}>{ttsSettings.rate.toFixed(2)}x</Text>
+                </View>
+                <View style={styles.sliderButtons}>
+                  {[0.75, 0.85, 0.95, 1.0, 1.15].map((rate) => (
+                    <TouchableOpacity
+                      key={rate}
+                      style={[
+                        styles.radiusButton,
+                        ttsSettings.rate === rate && styles.radiusButtonActive,
+                      ]}
+                      onPress={() => updateTtsSetting('rate', rate)}
+                    >
+                      <Text
+                        style={[
+                          styles.radiusButtonText,
+                          ttsSettings.rate === rate && styles.radiusButtonTextActive,
+                        ]}
+                      >
+                        {rate}x
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.testTtsButton} onPress={testTTS}>
+                <Ionicons name="play-circle" size={22} color={Colors.dark.text} />
+                <Text style={styles.testTtsButtonText}>Test Voice Alert</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Geofencing / Location Alerts */}
@@ -705,5 +789,37 @@ const styles = StyleSheet.create({
     color: Colors.dark.textMuted,
     fontSize: 12,
     marginTop: 32,
+  },
+  ttsInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.dark.accent + '15',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.dark.accent + '30',
+  },
+  ttsInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    lineHeight: 18,
+  },
+  testTtsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.dark.accent,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 4,
+  },
+  testTtsButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.dark.text,
   },
 });
